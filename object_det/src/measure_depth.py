@@ -3,6 +3,7 @@ import rospy
 import cv2
 from vision_msgs.msg import Detection2DArray
 from visualization_msgs.msg import Marker
+from std_msgs.msg import Float32MultiArray
 from cv_bridge import CvBridge 
 import numpy as np
 
@@ -19,19 +20,25 @@ cx = 329.486994
 cy = 238.680561
 chair_height = 75 # centimeters, the previous values are pixels
 marker_pub = rospy.Publisher("visualization_marker", Marker, queue_size=10)
+detect_pub = rospy.Publisher("detect_orb_data", Float32MultiArray, queue_size=10)
 
 
 def det_callback(det_data):
     #rospy.loginfo("Received data...")
     #rospy.loginfo(det_data.detections[0])
     # Choose only chairs.
-    for elem in [x for x in det_data.detections if x.results[0].id == 62]:
-        depth = (fy/elem.bbox.size_y)*chair_height 
+    for elem in [x for x in det_data.detections if x.results[0].id == 62 and x.results[0].score >= 0.91]:
+        depth = (fy/elem.bbox.size_y)*chair_height/100 # 100 for the cm to meters conversion. <3
         x = (elem.bbox.center.x - cx) * (depth/fx)
         y = (elem.bbox.center.y - cy) * (depth/fy)
         rospy.loginfo(depth)
         rospy.loginfo("x: " + str(x))
         rospy.loginfo("y: " + str(y))
+        
+        #Send data to modified ORB-SLAM2
+        float_data = Float32MultiArray()
+        float_data.data = [depth, elem.bbox.center.x, elem.bbox.center.y, elem.bbox.size_y, elem.bbox.size_x]
+        detect_pub.publish(float_data)
 
         # Create a marker for the chair 
         marker = Marker()
@@ -52,7 +59,6 @@ def det_callback(det_data):
         marker.color.g = 0.0
         marker.color.b = 0.0
         marker_pub.publish(marker)
-:orangu
 
 def main():
     rospy.init_node("chair_calculator", anonymous=True)
