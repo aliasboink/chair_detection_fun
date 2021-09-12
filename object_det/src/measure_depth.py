@@ -86,7 +86,7 @@ class ChairMagic():
             marker.pose.position.y = -x 
             marker.pose.position.z = -y 
             marker.pose.orientation.w = 1.0
-
+            # Other pretty variables
             marker.scale.x = 1.5
             marker.scale.y = 1.5  
             marker.scale.z = 2
@@ -94,15 +94,22 @@ class ChairMagic():
             marker.color.r = 1.0
             marker.color.g = 0.45
             marker.color.b = 0.8
-            # maths
+            # Painful maths because there is a horrible lack of Python documentation for this specific matter.
+            # Added rotation component from transform quaternion.
             pose_matrix = tf.transformations.quaternion_matrix([trans.transform.rotation.x,trans.transform.rotation.y,trans.transform.rotation.z,trans.transform.rotation.w])
+            # Added the translation.
             pose_matrix[0,3] = trans.transform.translation.x
             pose_matrix[1,3] = trans.transform.translation.y
             pose_matrix[2,3] = trans.transform.translation.z
+            # Did the woobly doobly maths with vector multiplication.
             marker_vector = np.array([marker.pose.position.x, marker.pose.position.y, marker.pose.position.z, 1])
+            # This should work. Maybe. It still seems rather off.
             marker_vector_final = np.dot(pose_matrix, marker_vector)
+            marker.pose.position.x = marker_vector_final[0]
+            marker.pose.position.y = marker_vector_final[1] 
+            marker.pose.position.z = marker_vector_final[2] 
+
             rospy.loginfo(marker_vector_final)
-            rospy.loginfo(marker_vector)
             #rospy.loginfo(pose_matrix)
 
             self.marker_pub.publish(marker)
