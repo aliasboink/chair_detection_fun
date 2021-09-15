@@ -13,12 +13,13 @@ from cv_bridge import CvBridge
 import numpy as np
 
 ''' 
-Raspberry PI 640
+Raspberry PI v2 640x480
 projection
 503.704010 0.000000 329.486994 0.000000
 0.000000 505.431824 238.680651 0.000000
 0.000000 0.000000 1.000000 0.000000
 '''
+
 class ChairMagic():
 
     def __init__(self):
@@ -31,12 +32,12 @@ class ChairMagic():
         self.fy = 505.431824
         self.cx = 329.486994
         self.cy = 238.680561
-        self.chair_height = 75 #centimeters, the previous values are pixels
+        self.chair_height = 93 #this is in centimeters, the previous values are pixels
         # ====================== CAMERA ELEMENTS ====================== #
         # ======================= ROSPY ELEMENTS ====================== #
         self.rate = rospy.Rate(10.0) 
         self.tf_buffer = tf2_ros.Buffer() #tf2 transform buffer
-        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)#tf2 listener to get the frame transforms
+        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer) #tf2 listener to get the frame transforms
         self.marker_pub = rospy.Publisher("visualization_marker", Marker, queue_size=10) #Marker (RViz) publisher
         self.detect_pub = rospy.Publisher("detect_orb_data", Float32MultiArray, queue_size=10) #Publisher for ORB-SLAM2 data, 5 float variables.
         rospy.Subscriber("/detectnet/detections", Detection2DArray, self.det_callback, queue_size=2)
@@ -52,7 +53,7 @@ class ChairMagic():
         #rospy.loginfo("Received data...")
         #rospy.loginfo(det_data.detections[0])
         # Choose only chairs.
-        for elem in [x for x in det_data.detections if x.results[0].id == 62 and x.results[0].score >= 0.95]:
+        for elem in [x for x in det_data.detections if x.results[0].id == 62 and x.results[0].score >= 0.60]:
             # 10 for the cm to decimeters conversion, better for scale
             depth = (self.fy/elem.bbox.size_y)*self.chair_height/10 
             x = (elem.bbox.center.x  - self.cx) * (depth/self.fx)
@@ -69,6 +70,8 @@ class ChairMagic():
 
             # Fetch the transformation from the camera's frame to the map's frame.
             try:
+                # The two frame ID's could be reversed. This seems to be from /base_link to /map
+                # (which is what we want) based on the latest documentation and results.
                 trans = self.tf_buffer.lookup_transform("map", "base_link", rospy.Time(0))
             except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
                 self.rate.sleep()
@@ -81,12 +84,12 @@ class ChairMagic():
             marker.header.stamp = rospy.Time.now()
             marker.type = Marker.CUBE
             marker.action = Marker.ADD
-            # Hacked transform. <3
+            # Hacked transform from camera to RViz 3D space.
             marker.pose.position.x = depth 
             marker.pose.position.y = -x 
             marker.pose.position.z = -y 
             marker.pose.orientation.w = 1.0
-            # Other pretty variables
+            # Marker aspect variables.
             marker.scale.x = 1.5
             marker.scale.y = 1.5  
             marker.scale.z = 2
@@ -96,24 +99,28 @@ class ChairMagic():
             marker.color.b = 0.8
             # Painful maths because there is a horrible lack of Python documentation for this specific matter.
             # Added rotation component from transform quaternion.
+            # (could've been done with quaternion mathematics, but the rotation matrix is more intuitive)
             pose_matrix = tf.transformations.quaternion_matrix([trans.transform.rotation.x,trans.transform.rotation.y,trans.transform.rotation.z,trans.transform.rotation.w])
             # Added the translation.
             pose_matrix[0,3] = trans.transform.translation.x
             pose_matrix[1,3] = trans.transform.translation.y
             pose_matrix[2,3] = trans.transform.translation.z
             # Did the woobly doobly maths with vector multiplication.
+            # This is a homogenous 3D vector of the marker's position based on 
+            # the inverse of the projection matrix and depth estimation.
             marker_vector = np.array([marker.pose.position.x, marker.pose.position.y, marker.pose.position.z, 1])
             # This should work. Maybe. It still seems rather off.
-            marker_vector_final = np.dot(pose_matrix, marker_vector)
+            marker_vector_final = np.matmul(pose_matrix, marker_vector)
             marker.pose.position.x = marker_vector_final[0]
-            marker.pose.position.y = marker_vector_final[1] 
+            marker.pose.position.y = marker_vector_final[1]
             marker.pose.position.z = marker_vector_final[2] 
-
+            # Debugging
             rospy.loginfo(marker_vector_final)
-            #rospy.loginfo(pose_matrix)
+            rospy.loginfo(marker_vector)
 
             self.marker_pub.publish(marker)
             self.rate.sleep()
+
             
 
     def run(self):
