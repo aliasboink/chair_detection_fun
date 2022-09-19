@@ -8,3 +8,8 @@ I take information from the detectnet _node_ and otherwise leave it intact. All 
 > rosrun ros_deep_learning detectnet /detectnet/image_in:=/cam1/image_raw
 3. The camera publisher is simply another node you ought to run. If you want to see the image overlay (with the bounding boxes), simply run the "camera_subscriber.py". This works with OpenCV, so it will be heavily delayed, but you can use it for debugging.
 > rosrun camera_stream_csi camera_publisher.py 
+
+## Some Implementation Issues
+There are some implementation issues that I've hazardly commented about in: 
+https://github.com/aliasboink/chair_detection_fun/blob/main/object_det/src/measure_depth.py
+The first bug with the mirrored chairs is very easily solved by using the sklearn library and utilize a function or two from there (fixed that locally, but lost the code). You can also just use whatever other implementation that's not that silly.
