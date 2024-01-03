@@ -128,11 +128,7 @@ class ChairMagic():
 
     def det_callback(self, det_data):
         '''
-        This function handles a bit too much. It handles the detected object filtering, the 
-        depth calculation, and the marker position calculations and placement.
-        Recently turned this into a class to more easily manage the different aspects of the code.
-        The mathematics aren't as efficient as they could be computationally, but for the sake
-        of "novice's clarity" I will leave it as is for now.
+        This function handles a bit too much.
         '''
         #rospy.loginfo("Received data...")
         #rospy.loginfo(det_data.detections[0])
@@ -162,7 +158,6 @@ class ChairMagic():
                 rospy.loginfo("Transform not found, maybe ORB-SLAM ROS is not running?")
                 continue
 
-            # Painful maths because there is a horrible lack of Python documentation for this specific matter.
             # Added rotation component from transform quaternion.
             # (could've been done with quaternion mathematics, but the rotation matrix is more intuitive)
             pose_matrix = tf.transformations.quaternion_matrix([trans.transform.rotation.x,trans.transform.rotation.y,trans.transform.rotation.z,trans.transform.rotation.w])
@@ -170,7 +165,6 @@ class ChairMagic():
             pose_matrix[0,3] = trans.transform.translation.x
             pose_matrix[1,3] = trans.transform.translation.y
             pose_matrix[2,3] = trans.transform.translation.z
-            # Did the woobly doobly maths with vector multiplication.
             # This is a homogenous 3D vector of the marker's position based on 
             # the inverse of the projection matrix and depth estimation.
             marker_vector = np.array([depth, -x, -y, 1]) # RVIZ (x,y,z,1) with a hacked transform from the camera values
